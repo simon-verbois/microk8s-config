@@ -1,0 +1,25 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  # Name referenced by the NVIDIA cluster policy patch.
+  name: time-slicing-config-all
+data:
+  any: |-
+    version: v1
+    flags:
+      # Keep `none` unless you are explicitly using MIG.
+      migStrategy: none
+    sharing:
+      timeSlicing:
+        # Keep the original resource name `nvidia.com/gpu`.
+        renameByDefault: false
+
+        # Allow Pods to request more than one shared slice if needed.
+        failRequestsGreaterThanOne: false
+
+        resources:
+          - name: nvidia.com/gpu
+            # Number of logical GPU slices exposed by the device plugin.
+            # Adjust this value to match your workload density target.
+            replicas: 8

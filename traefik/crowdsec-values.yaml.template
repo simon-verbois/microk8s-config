@@ -1,0 +1,51 @@
+# Example CrowdSec Helm values for integration with Traefik on MicroK8s.
+# Official chart reference:
+# https://github.com/crowdsecurity/helm-charts/blob/main/charts/crowdsec/values.yaml
+
+container_runtime: containerd
+
+agent:
+  acquisition:
+    - namespace: traefik
+      podName: traefik-*
+      program: traefik
+      # Useful on some container runtimes when inotify is not available.
+      poll_without_inotify: true
+
+  env:
+    - name: COLLECTIONS
+      # Traefik parsers plus common HTTP protection scenarios.
+      value: "crowdsecurity/traefik crowdsecurity/http-cve"
+    - name: PARSERS
+      # Parse container logs and Traefik log format.
+      value: "crowdsecurity/cri-logs crowdsecurity/traefik-logs"
+
+  volumes:
+    - name: varlog
+      hostPath:
+        # Container log location on the Kubernetes node.
+        path: /var/log/containers
+        type: Directory
+
+  volumeMounts:
+    - name: varlog
+      mountPath: /var/log/containers
+      readOnly: true
+
+lapi:
+  dashboard:
+    enabled: false
+
+  persistentVolume:
+    data:
+      enabled: true
+      size: 1Gi
+      # Replace with the storage class available in your cluster.
+      storageClassName: custom-hostpath
+
+  service:
+    type: ClusterIP
+    ports:
+      - name: lapi
+        port: 8080
+        targetPort: 8080

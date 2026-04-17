@@ -1,3 +1,7 @@
+# Example Traefik Helm values for MicroK8s.
+# # Official chart reference:
+# # https://github.com/traefik/traefik-helm-chart/blob/master/traefik/values.yaml
+
 env:
   - name: TZ
     value: Europe/Brussels
@@ -21,13 +25,13 @@ experimental:
     crowdsec:
       moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
       mountPath: /plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
-      type: localPath
-      volumeName: traefik-plugins
+      type: hostPath
+      hostPath: /data/md0/microk8s-config/traefik/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
     geoblock:
       moduleName: github.com/PascalMinder/geoblock
       mountPath: /plugins-local/src/github.com/PascalMinder/geoblock
-      type: localPath
-      volumeName: traefik-plugins
+      type: hostPath
+      hostPath: /data/md0/microk8s-config/traefik/src/github.com/PascalMinder/geoblock
 
 certificatesResolvers:
   ovhresolver:
@@ -95,10 +99,6 @@ service:
 deployment:
   strategy:
     type: Recreate
-  additionalVolumes:
-    - name: traefik-plugins
-      persistentVolumeClaim:
-        claimName: traefik-plugins
   initContainers:
     - name: volume-permissions
       image: busybox:latest

@@ -1,35 +1,10 @@
-# Example Traefik Helm values for MicroK8s.
-# Official chart reference:
-# https://github.com/traefik/traefik-helm-chart/blob/master/traefik/values.yaml
-
-installCRDs: true
-
-globalArguments:
-  # Disable anonymous telemetry and automatic version checks.
-  - "--global.sendanonymoususage=false"
-  - "--global.checknewversion=false"
-
 env:
   - name: TZ
-    # Set the timezone used inside the Traefik container.
-    value: Europe/Paris
+    value: Europe/Brussels
 
 envFrom:
   - secretRef:
-      # Secret containing OVH DNS API credentials.
       name: ovh-credentials
-
-certificatesResolvers:
-  ovhresolver:
-    acme:
-      # Email used for Let's Encrypt registration and expiry notices.
-      email: "admin@example.com"
-      storage: "/data/acme.json"
-      dnsChallenge:
-        provider: "ovh"
-        propagation:
-          # Increase this value if DNS propagation is slow.
-          delayBeforeChecks: 30
 
 providers:
   kubernetesCRD:
@@ -37,48 +12,68 @@ providers:
     allowCrossNamespace: true
   kubernetesIngress:
     enabled: true
+    publishedService:
+      enabled: true
 
-entryPoints:
+experimental:
+  abortOnPluginFailure: false
+  localPlugins:
+    crowdsec:
+      moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      mountPath: /plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      type: localPath
+      volumeName: traefik-plugins
+    geoblock:
+      moduleName: github.com/PascalMinder/geoblock
+      mountPath: /plugins-local/src/github.com/PascalMinder/geoblock
+      type: localPath
+      volumeName: traefik-plugins
+
+certificatesResolvers:
+  ovhresolver:
+    acme:
+      email: admin@example.org
+      storage: /data/acme.json
+      dnsChallenge:
+        provider: ovh
+        propagation:
+          delayBeforeChecks: 30
+
+additionalArguments:
+  - "--global.sendanonymoususage=false"
+  - "--global.checknewversion=false"
+
+ports:
   web:
-    address: ":8000"
+    port: 8000
+    exposedPort: 80
+    protocol: TCP
+    expose:
+      default: true
     http:
       redirections:
         entryPoint:
           to: websecure
           scheme: https
+          permanent: true
+    proxyProtocol:
+      insecure: true
+
   websecure:
-    address: ":8443"
+    port: 8443
+    exposedPort: 443
+    protocol: TCP
+    expose:
+      default: true
+    proxyProtocol:
+      insecure: true
     http:
-      compress: {}
-    tls:
-      sniStrict: true
+      tls:
+        enabled: true
+        certResolver: ovhresolver
 
 api:
   dashboard: false
-
-additionalArguments:
-  # Keep these only if your load balancer or edge proxy sends Proxy Protocol headers.
-  - "--entrypoints.web.proxyProtocol.insecure=true"
-  - "--entrypoints.websecure.proxyProtocol.insecure=true"
-
-  # Local plugin declarations.
-  - "--experimental.localPlugins.crowdsec.moduleName=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-  - "--experimental.localPlugins.geoblock.moduleName=github.com/PascalMinder/geoblock"
-
-volumes: []
-
-additionalVolumeMounts:
-  - name: plugin-crowdsec-local
-    mountPath: /plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/
-  - name: plugin-geoblock-local
-    mountPath: /plugins-local/src/github.com/PascalMinder/geoblock/
-
-persistence:
-  enabled: true
-  path: /data
-  size: 1Gi
-  # Replace with your storage class name.
-  storageClass: custom-hostpath
 
 logs:
   general:
@@ -89,40 +84,34 @@ logs:
     filePath: /data/access.log
 
 service:
-  type: LoadBalancer
-  externalTrafficPolicy: Local
+  enabled: true
+  single: true
   annotations:
-    # Example annotation for MetalLB with Proxy Protocol support.
     service.beta.kubernetes.io/metallb-loadbalancer-proxy-protocol: "*"
-  ports:
-    web:
-      port: 80
-      targetPort: 8000
-    websecure:
-      port: 443
-      targetPort: 8443
+  spec:
+    type: LoadBalancer
+    externalTrafficPolicy: Local
 
 deployment:
   strategy:
     type: Recreate
-
+  additionalVolumes:
+    - name: traefik-plugins
+      persistentVolumeClaim:
+        claimName: traefik-plugins
   initContainers:
     - name: volume-permissions
       image: busybox:latest
-      # Create the ACME storage file and restrict permissions.
-      command: ["sh", "-c", "touch /data/acme.json; chmod -v 600 /data/acme.json"]
+      command:
+        - sh
+        - -c
+        - touch /data/acme.json && chmod 600 /data/acme.json
       volumeMounts:
         - name: data
           mountPath: /data
 
-  additionalVolumes:
-    - name: plugin-crowdsec-local
-      hostPath:
-        # Replace with the local path where the CrowdSec Traefik plugin is stored.
-        path: /path/to/traefik/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/
-        type: Directory
-    - name: plugin-geoblock-local
-      hostPath:
-        # Replace with the local path where the GeoBlock Traefik plugin is stored.
-        path: /path/to/traefik/plugins-local/src/github.com/PascalMinder/geoblock/
-        type: Directory
+persistence:
+  enabled: true
+  path: /data
+  size: 1Gi
+  storageClass: hostpath-sc

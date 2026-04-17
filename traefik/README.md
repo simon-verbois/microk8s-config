@@ -1,123 +1,227 @@
-# Traefik Configuration For MicroK8s
+efik Configuration for MicroK8s
 
-This folder contains an example Traefik setup for MicroK8s.
+This folder provides a clean and modern Traefik setup for MicroK8s using:
 
-It combines ingress, TLS, and security-related middleware in one place. The sample configuration is built around:
+* Traefik deployed with Helm (chart v39+)
+* Let's Encrypt certificates via OVH DNS challenge
+* CrowdSec integration
+* Local plugins loaded via Kubernetes PVC (`localPath`)
+* Security middlewares (rate limiting, headers, geo filtering, etc.)
 
-- Traefik deployed with Helm
-- Let's Encrypt certificates with the OVH DNS challenge
-- CrowdSec integration
-- Geo-blocking, IP allow lists, rate limiting, compression, and security headers
+This setup avoids deprecated configurations and follows the current Traefik Helm chart best practices.
 
-## Files
+---
 
-- `traefik-values.yaml`: Helm values for the Traefik deployment
-- `crowdsec-values.yaml`: Helm values for the CrowdSec deployment
-- `middlewares.yaml`: Traefik middleware examples
-- `tls-profile.yaml`: TLS option example
-- `*.template`: template files to copy and adapt
+## 📁 Files
 
-## Prerequisites
+* `traefik-values.yaml` → Helm values for Traefik
+* `crowdsec-values.yaml` → Helm values for CrowdSec
+* `middlewares.yaml` → Security middlewares
+* `tls-profile.yaml` → TLS configuration
+* `*.template` → editable templates
 
-- MicroK8s is installed and running
-- the `helm3` addon is enabled
-- MetalLB or another `LoadBalancer` solution is available
-- a domain name is managed in OVH if you want to use the included ACME DNS challenge example
-- local storage is available for persistent data such as `acme.json` and CrowdSec data
+---
 
-## What This Setup Covers
+## ⚙️ Prerequisites
 
-- automatic HTTPS with a DNS challenge
-- persistent Traefik data storage
-- middleware examples for hardening and access control
-- local plugin loading for CrowdSec and geoblocking
+* MicroK8s installed and running
+* `helm3` addon enabled
+* `metallb` (or another LoadBalancer solution)
+* A domain managed in OVH (for ACME DNS challenge)
+* Local storage (`hostpath-sc` or equivalent)
 
-This folder is an example baseline, not a one-click production installer.
+---
 
-## Quick Start
+## 🚀 Quick Start
 
-Enable the required addons:
+### Enable addons
 
 ```bash
 microk8s enable helm3 metallb
 ```
 
-Create the namespaces:
+### Create namespaces
 
 ```bash
 microk8s kubectl create namespace traefik
 microk8s kubectl create namespace crowdsec
 ```
 
-Create the OVH credentials secret used by Traefik:
+---
+
+## 🔐 OVH Credentials
 
 ```bash
 microk8s kubectl create secret generic ovh-credentials \
-  --namespace=traefik \
+  -n traefik \
   --from-literal=OVH_ENDPOINT=ovh-eu \
   --from-literal=OVH_APPLICATION_KEY=CHANGE_ME \
   --from-literal=OVH_APPLICATION_SECRET=CHANGE_ME \
   --from-literal=OVH_CONSUMER_KEY=CHANGE_ME
 ```
 
-Install CrowdSec:
+---
+
+## 🛡️ Install CrowdSec
 
 ```bash
 microk8s helm3 repo add crowdsec https://crowdsecurity.github.io/helm-charts
 microk8s helm3 repo update
+
 microk8s helm3 install crowdsec crowdsec/crowdsec \
   -n crowdsec \
   -f crowdsec-values.yaml
 ```
 
-Apply the middleware and TLS resources:
+---
+
+## 🔌 Local Plugins (Modern Setup)
+
+Plugins are loaded via a **PVC-backed volume** using the `localPath` mechanism.
+
+### Step 1 — Create PVC
+
+```bash
+microk8s kubectl apply -n traefik -f - <<EOF
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: traefik-plugins
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: hostpath-sc
+  resources:
+    requests:
+      storage: 500Mi
+EOF
+```
+
+---
+
+### Step 2 — Populate Plugins
+
+```bash
+microk8s kubectl run plugin-loader \
+  --namespace=traefik \
+  --image=busybox:latest \
+  --restart=Never \
+  --overrides='{
+    "spec": {
+      "volumes": [{
+        "name": "plugins",
+        "persistentVolumeClaim": {"claimName": "traefik-plugins"}
+      }],
+      "containers": [{
+        "name": "loader",
+        "image": "busybox:latest",
+        "command": ["sh", "-c", "sleep 3600"],
+        "volumeMounts": [{
+          "name": "plugins",
+          "mountPath": "/plugins"
+        }]
+      }]
+    }
+  }'
+
+microk8s kubectl wait pod/plugin-loader -n traefik --for=condition=Ready
+
+microk8s kubectl cp /data/md0/microk8s-config/traefik/src/. \
+  traefik/plugin-loader:/plugins/
+
+microk8s kubectl delete pod plugin-loader -n traefik
+```
+
+---
+
+## 🔐 Apply Security Resources
 
 ```bash
 microk8s kubectl apply -f middlewares.yaml
 microk8s kubectl apply -f tls-profile.yaml
 ```
 
-Install Traefik:
+---
+
+## 🌐 Install Traefik
 
 ```bash
 microk8s helm3 repo add traefik https://traefik.github.io/charts
 microk8s helm3 repo update
+
 microk8s helm3 install traefik traefik/traefik \
   -n traefik \
-  -f traefik-values.yaml
+  -f traefik-values.yaml \
+  --version 39.0.8
 ```
 
-## Important Customization Points
+---
 
-Review these values before deployment:
-
-- email address used for ACME
-- OVH credentials
-- storage class name
-- local plugin paths
-- allowed IP ranges
-- allowed or blocked countries
-- CrowdSec LAPI key
-- timezone
-
-## Operations
-
-Upgrade Traefik after editing the values file:
+## 🔄 Upgrade Traefik
 
 ```bash
 microk8s helm3 upgrade traefik traefik/traefik \
   -n traefik \
-  -f traefik-values.yaml
+  -f traefik-values.yaml \
+  --version 39.0.8
 ```
 
-View Traefik logs:
+---
+
+## 📊 Operations
+
+### Check pods
 
 ```bash
-microk8s kubectl logs -n traefik -f deployment/traefik
+kubectl -n traefik get pods
 ```
 
-## Notes
+### Logs
 
-- The current example loads Traefik plugins from local host paths. Make sure those paths exist on the node.
-- `middlewares.yaml` contains example values that must be replaced before production use.
-- If you do not use OVH, you will need to adapt the ACME DNS resolver configuration.
+```bash
+kubectl -n traefik logs -f deployment/traefik
+```
+
+### Check plugins loaded
+
+```bash
+kubectl -n traefik logs deployment/traefik | grep plugin
+```
+
+---
+
+## ⚠️ Important Notes
+
+* Plugins are loaded from a PVC → **cluster portable**
+* No dependency on node filesystem (no `hostPath`)
+* Compatible with future Traefik chart versions
+* `inlinePlugin` is NOT used (size limits, not suitable for geoblock DB)
+
+---
+
+## 🔧 Customization
+
+Review before production:
+
+* ACME email
+* OVH credentials
+* storageClass
+* plugin sources
+* allowed IPs / countries
+* CrowdSec API key
+* TLS policies
+
+---
+
+## 🧠 Architecture Summary
+
+```
+PVC (traefik-plugins)
+        ↓
+Mounted into Traefik (/plugins-local)
+        ↓
+Loaded via localPlugins (type: localPath)
+        ↓
+Used by middlewares (crowdsec, geoblock)
+```
+

@@ -5,47 +5,54 @@
 container_runtime: containerd
 
 agent:
+  enabled: true
   acquisition:
-    - namespace: traefik
-      podName: traefik-*
-      program: traefik
-      # Useful on some container runtimes when inotify is not available.
+    - namespace: "traefik"
+      podName: "traefik-*"
+      program: "traefik"
       poll_without_inotify: true
-
   env:
     - name: COLLECTIONS
-      # Traefik parsers plus common HTTP protection scenarios.
       value: "crowdsecurity/traefik crowdsecurity/http-cve"
     - name: PARSERS
-      # Parse container logs and Traefik log format.
       value: "crowdsecurity/cri-logs crowdsecurity/traefik-logs"
-
-  volumes:
-    - name: varlog
-      hostPath:
-        # Container log location on the Kubernetes node.
-        path: /var/log/containers
-        type: Directory
-
-  volumeMounts:
-    - name: varlog
-      mountPath: /var/log/containers
-      readOnly: true
+  rbac:
+    create: true
+  persistentVolume:
+    config:
+      enabled: true
+      storageClassName: hostpath-sc
+      size: 100Mi
 
 lapi:
   dashboard:
     enabled: false
-
   persistentVolume:
     data:
       enabled: true
       size: 1Gi
-      # Replace with the storage class available in your cluster.
-      storageClassName: custom-hostpath
-
+      storageClassName: hostpath-sc
+    config:
+      enabled: true
+      size: 100Mi
+      storageClassName: hostpath-sc
   service:
     type: ClusterIP
     ports:
       - name: lapi
         port: 8080
         targetPort: 8080
+
+appsec:
+  enabled: true
+  acquisitions:
+    - appsec_configs:
+        - crowdsecurity/appsec-default
+      labels:
+        type: appsec
+      listen_addr: 0.0.0.0:7422
+      path: /
+      source: appsec
+  env:
+    - name: COLLECTIONS
+      value: crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules

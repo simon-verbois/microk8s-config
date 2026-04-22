@@ -21,12 +21,11 @@ providers:
 
 experimental:
   abortOnPluginFailure: false
+  plugins:
+    bouncer:
+      moduleName: "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+      version: "v1.5.1"
   localPlugins:
-    crowdsec:
-      moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
-      mountPath: /plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
-      type: hostPath
-      hostPath: /data/md0/microk8s-config/traefik/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
     geoblock:
       moduleName: github.com/PascalMinder/geoblock
       mountPath: /plugins-local/src/github.com/PascalMinder/geoblock
@@ -85,7 +84,6 @@ logs:
   access:
     enabled: true
     format: json
-    filePath: /data/access.log
 
 service:
   enabled: true

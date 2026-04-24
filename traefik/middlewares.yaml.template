@@ -6,12 +6,8 @@ metadata:
   namespace: traefik
 spec:
   rateLimit:
-    # Average number of requests per period before throttling.
     average: 200
-
-    # Short burst capacity allowed above the average rate.
     burst: 150
-
     sourceCriterion:
       ipStrategy:
         depth: 1
@@ -71,6 +67,7 @@ spec:
       api: "https://get.geojs.io/v1/ip/country/{ip}"
       apiTimeoutMs: 1500
       cacheSize: 500
+      ipDatabaseCachePath: "/data/geoblock/ip-cache.json"
       allowLocalRequests: true
       logLocalRequests: false
       logAllowedRequests: false
@@ -79,7 +76,7 @@ spec:
       allowUnknownCountries: false
       forceMonthlyUpdate: true
       blackListMode: false
-      countries:
+      countries:  # Define the countries you want to allow, or blacklist depending on the previous setting
         - "BE"
         - "FR"
         - "LU"

@@ -2,15 +2,10 @@
 apiVersion: traefik.io/v1alpha1
 kind: TLSOption
 metadata:
-  # Reference this TLS option from your IngressRoute objects if needed.
   name: tls-profile
   namespace: traefik
 spec:
-  # Enforce TLS 1.2 or newer.
   minVersion: VersionTLS12
-
-  # Example modern cipher suite list for compatibility and hardening.
-  # Adjust it if your clients or compliance requirements differ.
   cipherSuites:
     - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
     - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384

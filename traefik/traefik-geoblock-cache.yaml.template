@@ -1,0 +1,13 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: traefik-geoblock-cache
+  namespace: traefik
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: hostpath-sc
+  resources:
+    requests:
+      storage: 100Mi

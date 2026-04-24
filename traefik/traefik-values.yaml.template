@@ -25,12 +25,9 @@ experimental:
     bouncer:
       moduleName: "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
       version: "v1.5.1"
-  localPlugins:
     geoblock:
-      moduleName: github.com/PascalMinder/geoblock
-      mountPath: /plugins-local/src/github.com/PascalMinder/geoblock
-      type: hostPath
-      hostPath: /data/md0/microk8s-config/traefik/src/github.com/PascalMinder/geoblock
+      moduleName: "github.com/PascalMinder/geoblock"
+      version: "v0.3.7"
 
 certificatesResolvers:
   ovhresolver:
@@ -94,9 +91,17 @@ service:
     type: LoadBalancer
     externalTrafficPolicy: Local
 
+additionalVolumeMounts:
+  - name: geoblock-cache
+    mountPath: /data/geoblock
+
 deployment:
   strategy:
     type: Recreate
+  additionalVolumes:
+    - name: geoblock-cache
+      persistentVolumeClaim:
+        claimName: traefik-geoblock-cache
   initContainers:
     - name: volume-permissions
       image: busybox:latest

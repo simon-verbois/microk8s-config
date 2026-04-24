@@ -1,5 +1,4 @@
-# Example CrowdSec Helm values for integration with Traefik on MicroK8s.
-# Official chart reference:
+# Default values overwritten
 # https://github.com/crowdsecurity/helm-charts/blob/main/charts/crowdsec/values.yaml
 
 container_runtime: containerd
@@ -45,9 +44,39 @@ lapi:
 
 appsec:
   enabled: true
+  configs:
+    allow-websockets.yaml: |
+      name: custom/allow-websockets
+      on_match:
+        - filter: req.Host == "immich.verbois.ovh" && req.URL.Path startsWith "/api/socket.io/"
+          apply:
+            - CancelEvent()
+            - CancelAlert()
+            - SetRemediation("allow")
+        - filter: req.Host == "audiobook.verbois.ovh" && (req.URL.Path startsWith "/socket.io/" || req.URL.Path startsWith "/audiobookshelf/socket.io/")
+          apply:
+            - CancelEvent()
+            - CancelAlert()
+            - SetRemediation("allow")
+        - filter: req.Host == "vault.verbois.ovh" && req.URL.Path startsWith "/notifications/hub"
+          apply:
+            - CancelEvent()
+            - CancelAlert()
+            - SetRemediation("allow")
+        - filter: req.Host == "cloud.verbois.ovh" && req.URL.Path startsWith "/push/"
+          apply:
+            - CancelEvent()
+            - CancelAlert()
+            - SetRemediation("allow")
+        - filter: req.Host == "plex.verbois.ovh" && req.URL.Path startsWith "/:/websocket"
+          apply:
+            - CancelEvent()
+            - CancelAlert()
+            - SetRemediation("allow")
   acquisitions:
     - appsec_configs:
         - crowdsecurity/appsec-default
+        - custom/allow-websockets
       labels:
         type: appsec
       listen_addr: 0.0.0.0:7422

@@ -12,18 +12,18 @@ Configure kubelet image garbage collection thresholds by updating the kubelet ar
 
 ```bash
 sudo tee -a /var/snap/microk8s/current/args/kubelet >/dev/null <<'EOF'
---image-gc-high-threshold=75
---image-gc-low-threshold=50
+--image-gc-high-threshold=60
+--image-gc-low-threshold=40
 EOF
 ```
 
 ### Explanation
 
-* `--image-gc-high-threshold=75`
-  Triggers image garbage collection when disk usage reaches 75%.
+* `--image-gc-high-threshold=60`
+  Triggers image garbage collection when disk usage reaches 60%.
 
-* `--image-gc-low-threshold=50`
-  Removes unused images until disk usage drops back to 50%.
+* `--image-gc-low-threshold=40`
+  Removes unused images until disk usage drops back to 40%.
 
 ---
 

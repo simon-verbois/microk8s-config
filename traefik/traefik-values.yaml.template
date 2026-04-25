@@ -20,14 +20,20 @@ providers:
       enabled: true
 
 experimental:
-  abortOnPluginFailure: false
-  plugins:
+  abortOnPluginFailure: true
+  localPlugins:
     bouncer:
       moduleName: "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-      version: "v1.5.1"
+      mountPath: /plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      type: localPath
+      volumeName: plugins
+      subPath: src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
     geoblock:
       moduleName: "github.com/PascalMinder/geoblock"
-      version: "v0.3.7"
+      mountPath: /plugins-local/src/github.com/PascalMinder/geoblock
+      type: localPath
+      volumeName: plugins
+      subPath: src/github.com/PascalMinder/geoblock
 
 certificatesResolvers:
   ovhresolver:
@@ -94,14 +100,21 @@ service:
 additionalVolumeMounts:
   - name: geoblock-cache
     mountPath: /data/geoblock
+  - name: plugins
+    mountPath: /plugins-local
+
+updateStrategy:
+  type: Recreate
 
 deployment:
-  strategy:
-    type: Recreate
   additionalVolumes:
     - name: geoblock-cache
       persistentVolumeClaim:
         claimName: traefik-geoblock-cache
+    - name: plugins
+      persistentVolumeClaim:
+        claimName: traefik-plugins-pvc
+
   initContainers:
     - name: volume-permissions
       image: busybox:latest
@@ -112,6 +125,33 @@ deployment:
       volumeMounts:
         - name: data
           mountPath: /data
+
+    - name: download-local-plugins
+      image: alpine/git:latest
+      command:
+        - sh
+        - -c
+        - |
+          set -eu
+
+          mkdir -p /plugins-local/src/github.com/maxlerebourg
+          mkdir -p /plugins-local/src/github.com/PascalMinder
+
+          rm -rf /plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+          rm -rf /plugins-local/src/github.com/PascalMinder/geoblock
+
+          git clone --depth 1 --branch v1.5.1 \
+            https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin.git \
+            /plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+
+          git clone --depth 1 --branch v0.3.7 \
+            https://github.com/PascalMinder/geoblock.git \
+            /plugins-local/src/github.com/PascalMinder/geoblock
+
+          find /plugins-local/src/github.com -maxdepth 3 -type f -name go.mod -print
+      volumeMounts:
+        - name: plugins
+          mountPath: /plugins-local
 
 persistence:
   enabled: true

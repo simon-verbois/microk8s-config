@@ -13,7 +13,7 @@ Traefik setup for MicroK8s with:
 - `traefik-values.yaml`: Traefik Helm values
 - `crowdsec-values.yaml`: CrowdSec Helm values
 - `middlewares.yaml`: shared security middlewares
-- `traefik-geoblock-cache.yaml`: PVC used by the GeoBlock middleware cache
+- `traefik-geoblock-pvc.yaml`: PVCs used by the GeoBlock middleware cache and Traefik local plugins
 - `tls-profile.yaml`: TLS options
 - `*.template`: reusable sanitized templates. Secrets, personal IPs, and account-specific addresses stay as placeholders.
 
@@ -49,7 +49,7 @@ microk8s helm3 upgrade --install crowdsec crowdsec/crowdsec \
 Apply shared Traefik resources:
 
 ```bash
-microk8s kubectl apply -f traefik-geoblock-cache.yaml
+microk8s kubectl apply -f traefik-geoblock-pvc.yaml
 microk8s kubectl apply -f middlewares.yaml
 microk8s kubectl apply -f tls-profile.yaml
 ```
@@ -68,6 +68,8 @@ microk8s helm3 upgrade --install traefik traefik/traefik \
 ## Notes
 
 - Review OVH credentials, ACME email, storage class, allowed IPs, and allowed countries before production use.
+- Traefik loads the CrowdSec bouncer and GeoBlock as local plugins. The `download-local-plugins` init container clones the pinned plugin tags into `traefik-plugins-pvc`, then Traefik mounts them from `/plugins-local`.
+- CrowdSec LAPI auto-registration is enabled for cluster/private ranges and stale API keys or agent passwords are cleaned automatically.
 - `public-secure-chain` is the default middleware chain for public routes.
 - WebSocket paths for Immich, Audiobookshelf, Vaultwarden, Nextcloud notify_push, and Plex are allowed at AppSec remediation level only. They still pass through the CrowdSec IP bouncer, GeoBlock, rate limit, headers, and compression.
 - Templates should stay aligned with the local `.yaml` files when the live config changes, except for intentionally sanitized values.

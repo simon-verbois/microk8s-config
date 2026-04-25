@@ -11,3 +11,17 @@ spec:
   resources:
     requests:
       storage: 100Mi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: traefik-plugins-pvc
+  namespace: traefik
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: hostpath-sc
+  resources:
+    requests:
+      storage: 1Gi

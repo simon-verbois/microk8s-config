@@ -1,6 +1,3 @@
-# Default values overwritten
-# https://github.com/crowdsecurity/helm-charts/blob/main/charts/crowdsec/values.yaml
-
 container_runtime: containerd
 
 agent:
@@ -19,13 +16,12 @@ agent:
     create: true
   persistentVolume:
     config:
-      enabled: true
-      storageClassName: hostpath-sc
-      size: 100Mi
+      enabled: false
 
 lapi:
   dashboard:
     enabled: false
+
   persistentVolume:
     data:
       enabled: true
@@ -35,6 +31,7 @@ lapi:
       enabled: true
       size: 100Mi
       storageClassName: hostpath-sc
+
   service:
     type: ClusterIP
     ports:
@@ -44,35 +41,37 @@ lapi:
 
 appsec:
   enabled: true
+
   configs:
     allow-websockets.yaml: |
       name: custom/allow-websockets
       on_match:
-        - filter: req.Host == "immich.verbois.ovh" && req.URL.Path startsWith "/api/socket.io/"
+        - filter: req.Host == "immich.example.org" && req.URL.Path startsWith "/api/socket.io/"
           apply:
             - CancelEvent()
             - CancelAlert()
             - SetRemediation("allow")
-        - filter: req.Host == "audiobook.verbois.ovh" && (req.URL.Path startsWith "/socket.io/" || req.URL.Path startsWith "/audiobookshelf/socket.io/")
+        - filter: req.Host == "audiobook.example.org" && (req.URL.Path startsWith "/socket.io/" || req.URL.Path startsWith "/audiobookshelf/socket.io/")
           apply:
             - CancelEvent()
             - CancelAlert()
             - SetRemediation("allow")
-        - filter: req.Host == "vault.verbois.ovh" && req.URL.Path startsWith "/notifications/hub"
+        - filter: req.Host == "vault.example.org" && req.URL.Path startsWith "/notifications/hub"
           apply:
             - CancelEvent()
             - CancelAlert()
             - SetRemediation("allow")
-        - filter: req.Host == "cloud.verbois.ovh" && req.URL.Path startsWith "/push/"
+        - filter: req.Host == "cloud.example.org" && req.URL.Path startsWith "/push/"
           apply:
             - CancelEvent()
             - CancelAlert()
             - SetRemediation("allow")
-        - filter: req.Host == "plex.verbois.ovh" && req.URL.Path startsWith "/:/websocket"
+        - filter: req.Host == "plex.example.org" && req.URL.Path startsWith "/:/websocket"
           apply:
             - CancelEvent()
             - CancelAlert()
             - SetRemediation("allow")
+
   acquisitions:
     - appsec_configs:
         - crowdsecurity/appsec-default
@@ -82,6 +81,28 @@ appsec:
       listen_addr: 0.0.0.0:7422
       path: /
       source: appsec
+
   env:
     - name: COLLECTIONS
-      value: crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules
+      value: "crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules"
+
+config:
+  config.yaml.local: |
+    api:
+      client:
+        unregister_on_exit: true
+      server:
+        auto_registration:
+          enabled: true
+          token: "${REGISTRATION_TOKEN}"
+          allowed_ranges:
+            - "127.0.0.1/32"
+            - "10.0.0.0/8"
+            - "172.16.0.0/12"
+            - "192.168.0.0/16"
+    db_config:
+      flush:
+        bouncers_autodelete:
+          api_key: 1h
+        agents_autodelete:
+          login_password: 4m
